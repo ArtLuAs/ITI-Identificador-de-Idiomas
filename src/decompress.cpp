@@ -19,9 +19,9 @@ void decompressPPM(const string& inputFile, const string& outputFile, int order)
     ofstream outStream(outputFile, ios::binary);
 
     ContextModel model(order);
-    
-    // O vetor de exclusão vai de 0 a 258
-    vector<bool> isExcluded(259, false);
+
+    // O vetor de exclusão vai de 0 a 257 (sem o 258/reset)
+    vector<bool> isExcluded(258, false);
 
     cout << "Descomprimindo..." << endl;
 
@@ -30,15 +30,15 @@ void decompressPPM(const string& inputFile, const string& outputFile, int order)
         vector<TrieNode*> activeNodes = model.getActiveContextNodes();
 
         for (TrieNode* node : activeNodes) {
-            
+
             // Exclusões vindas dos escapes anteriores
-            for (uint32_t i = 0; i < 259; ++i) {
+            for (uint32_t i = 0; i < 258; ++i) {
                 if (isExcluded[i]) node->freqTable->excludeSymbol(i);
             }
 
             // Cálculo do Peso do Escape
             uint32_t uniqueSymbols = node->activeSymbols.size();
-            uint32_t escapeWeight = (uniqueSymbols > 0) ? uniqueSymbols : 1; 
+            uint32_t escapeWeight = (uniqueSymbols > 0) ? uniqueSymbols : 1;
             node->freqTable->set(256, escapeWeight);
 
             // Símbolo do arquivo comprimido
@@ -47,39 +47,28 @@ void decompressPPM(const string& inputFile, const string& outputFile, int order)
             // Restaura a tabela imediatamente após a leitura
             node->freqTable->restoreExcludedSymbols();
 
-            // Escape 
+            // Escape
             if (decodedSymbol == 256) {
                 for (uint32_t activeSym : node->activeSymbols) {
                     isExcluded[activeSym] = true;
                 }
             } else {
-                // Símbolo real (Char, EOF ou RESET)
-                break; 
+                // Símbolo real (Char ou EOF)
+                break;
             }
-        }
-
-        // piora da janela
-        if (decodedSymbol == 258) {
-            cout << "[!] Comando de RESET recebido. Reiniciando modelo..." << endl;
-            
-            model.reset();
-            
-            // Limpa a exclusão e pula para ler a PRÓXIMA letra 
-            fill(isExcluded.begin(), isExcluded.end(), false);
-            continue; 
         }
 
         // Fim de arquivo verdadeiro encontrado na Ordem-0
         if (decodedSymbol == 257) {
-            break; 
+            break;
         }
 
-        // Se não foi controle (nem 258 nem 257), escreve o caractere normal
+        // Escreve o caractere normal
         outStream.put(static_cast<char>(decodedSymbol));
-        
+
         // Limpa a máscara de exclusão para o próximo caractere
         fill(isExcluded.begin(), isExcluded.end(), false);
-        
+
         // Atualiza a árvore da Trie e a janela deslizante
         model.updateAndShift(decodedSymbol);
     }

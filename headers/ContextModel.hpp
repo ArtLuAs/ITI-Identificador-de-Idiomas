@@ -23,9 +23,6 @@ public:
 
     // Atualiza as frequências na árvore e avança a janela deslizante
     void updateAndShift(uint32_t symbol);
-
-    // resetar a árvore
-    void reset();
 };
 
 #endif // CONTEXTMODEL_HPP
