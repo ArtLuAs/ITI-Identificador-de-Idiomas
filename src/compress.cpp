@@ -80,28 +80,29 @@ void compressPPM(const string& input, const string& outputFile, int order) {
         ArithmeticEncoder encoder(32, bitOut);
 
         ContextModel model(order);
-        vector<bool> isExcluded(259, false); // 259 simbolos
+        vector<bool> isExcluded(258, false); // 258 símbolos (sem o 258/reset)
 
         // Abrindo csv
         string csvName = outputFile + "_grafico.csv";
         ofstream csvOut(csvName);
 
         // CABEÇALHO DINÂMICO NO CSV
-        csvOut << "BytesProcessados,L_Barra_Janela,L_Barra_Acumulado,L_Barra_Teorico";
+        csvOut << "BytesProcessados,L_Barra_Acumulado,L_Barra_Teorico";
         for (int k = 0; k <= order; ++k) {
                 csvOut << ",H_" << k;
         }
-        csvOut << ",SmoothedBPS,BitsNaJanela,ThresholdBPS,ResetFlag,ResetCount\n";
+        csvOut << "\n";
 
         // L_BARRA TEÓRICO ADAPTATIVO
         double informacaoAdaptativaAcumulada = 0.0;
+        long totalSymbolsProcessed = 0;
 
         auto encodeSymbol = [&](uint32_t symbol) {
                 vector<TrieNode*> activeNodes = model.getActiveContextNodes();
 
                 for (TrieNode* node : activeNodes) {
-                        for (uint32_t i = 0; i < 259; i++) {
-                                if (isExcluded[i]) 
+                        for (uint32_t i = 0; i < 258; i++) {
+                                if (isExcluded[i])
                                         node->freqTable->excludeSymbol(i);
                         }
 
@@ -112,7 +113,7 @@ void compressPPM(const string& input, const string& outputFile, int order) {
                         node->freqTable->set(256, escapeWeight);
 
                         if (node->freqTable->get(symbol) > 0) {
-                                // Cálculo da Informação do Símbolo no instante de predição 
+                                // Cálculo da Informação do Símbolo no instante de predição
                                 double p = static_cast<double>(node->freqTable->get(symbol)) / node->freqTable->getTotal();
                                 informacaoAdaptativaAcumulada += -log2(p);
 
@@ -134,90 +135,36 @@ void compressPPM(const string& input, const string& outputFile, int order) {
 
                 fill(isExcluded.begin(), isExcluded.end(), false);
 
-                // Não atualiza o modelo se for o EOF (257) nem reset (258)
-                if (symbol != 257 && symbol != 258)
+                // Não atualiza o modelo se for o EOF (257)
+                if (symbol != 257)
                         model.updateAndShift(symbol);
         };
 
-        cout << "Comprimindo com monitoramento de Janela e Exportacao CSV..." << endl;
-
-        // Monitoramento da janela
-        int j = 5000; // evitar ruidos
-        int symbolsInWindow = 0;
-        long previousBitSize = 0;
-
-        double smoothedBPS = 0.0;       // Usaremos Média Móvel em vez de valor absoluto
-        double thresholdPercent = 0.50; // 50% de tolerância para flutuações naturais
-        double safetyFloorBPS = 5.0;    // Só reseta se o BPS estiver pior que 5.0 bits/símbolo
-        int totalResets = 0;
-        int cooldownRestante = 0;
-
-        long totalSymbolsProcessed = 0;
+        cout << "Comprimindo..." << endl;
 
         for (unsigned char c : input) {
                 encodeSymbol(c);
-                symbolsInWindow++;
                 totalSymbolsProcessed++;
-
-                if (symbolsInWindow == j) {
-                        outStream.flush();
-                        long currentBitSize = static_cast<long>(outStream.tellp()) * 8;
-                        long bitsInWindow = currentBitSize - previousBitSize;
-
-                        double currentBPS = static_cast<double>(bitsInWindow) / j;
-                        double accumulatedBPS = static_cast<double>(currentBitSize) / totalSymbolsProcessed;
-                        double l_barra_teorico = informacaoAdaptativaAcumulada / totalSymbolsProcessed;
-
-                        if (smoothedBPS == 0.0)
-                                smoothedBPS = currentBPS;
-
-                        double thresholdBPS = smoothedBPS * (1.0 + thresholdPercent);
-                        int resetFlag = 0;
-
-                        // Decide o reset ANTES de gravar no CSV
-                        if (currentBPS > thresholdBPS && currentBPS > safetyFloorBPS && cooldownRestante == 0) {
-                                cout << "[!] Reset detectado (Media: " << fixed << setprecision(3)
-                                     << smoothedBPS << " -> Atual: " << currentBPS << " BPS). Total: "
-                                     << totalResets + 1 << endl;
-                                resetFlag = 1;
-                                totalResets++;
-                                encodeSymbol(258);
-                                model.reset();
-                                smoothedBPS = accumulatedBPS; 
-                                cooldownRestante = 5; // <- bloqueia por 5 janelas
-                        } else {
-                                smoothedBPS = (smoothedBPS * 0.7) + (currentBPS * 0.3);
-                                if (cooldownRestante > 0)
-                                        cooldownRestante--;
-                        }
-                        cout << "[DEBUG] resetFlag=" << resetFlag
-                             << " totalResets=" << totalResets
-                             << " bytes=" << totalSymbolsProcessed
-                             << endl;
-
-                        csvOut << totalSymbolsProcessed << ","
-                               << currentBPS << ","
-                               << accumulatedBPS << ","
-                               << l_barra_teorico;
-                        for (int k = 0; k <= order; ++k) {
-                                csvOut << "," << entropias[k];
-                        }
-                        csvOut << "," << smoothedBPS
-                               << "," << bitsInWindow
-                               << "," << thresholdBPS
-                               << "," << resetFlag
-                               << "," << totalResets
-                               << "\n";
-
-                        previousBitSize = currentBitSize;
-                        symbolsInWindow = 0;
-                }
         }
 
-        encodeSymbol(257); // EOF verdadeiro 
+        encodeSymbol(257); // EOF verdadeiro
 
         encoder.finish();
         bitOut.finish();
+        outStream.flush();
+
+        // Grava linha única de métricas no CSV
+        double accumulatedBPS = static_cast<double>(outStream.tellp()) * 8.0 / totalSymbolsProcessed;
+        double l_barra_teorico = informacaoAdaptativaAcumulada / totalSymbolsProcessed;
+
+        csvOut << totalSymbolsProcessed << ","
+               << accumulatedBPS << ","
+               << l_barra_teorico;
+        for (int k = 0; k <= order; ++k) {
+                csvOut << "," << entropias[k];
+        }
+        csvOut << "\n";
+
         outStream.close();
         csvOut.close();
 
