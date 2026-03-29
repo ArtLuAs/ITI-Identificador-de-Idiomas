@@ -9,20 +9,26 @@
 
 class ContextModel {
 private:
-    int maxOrder; // Ordem máxima (k) do nosso modelo PPM
-    std::unique_ptr<TrieNode> root; // O contexto global de Ordem-0 (raiz da árvore)
-    std::deque<uint32_t> history; // Janela deslizante que guarda os últimos 'k' caracteres
+    int maxOrder;
+    std::unique_ptr<TrieNode> root;
+    std::deque<uint32_t> history;
 
 public:
-    // Construtor: recebe o tamanho máximo do contexto
     ContextModel(int k);
 
-    // Retorna uma lista de nós ativos (do contexto MAIOR para o MENOR)
-    // Ex: Se o histórico é "AB", retorna os nós "AB", "B" e "" (Raiz).
+    // Retorna lista de nós ativos do maior contexto para o menor
     std::vector<TrieNode*> getActiveContextNodes() const;
 
-    // Atualiza as frequências na árvore e avança a janela deslizante
+    // Atualiza frequências na Trie e avança a janela deslizante (uso do Interpretador)
     void updateAndShift(uint32_t symbol);
+
+    // ---- Acesso para serialização (ModeloPersistente) ----
+    int getMaxOrder() const { return maxOrder; }
+    const std::deque<uint32_t>& getHistory() const { return history; }
+    TrieNode* getRoot() const { return root.get(); }
+
+    // Reconstrói o histórico durante o carregamento
+    void forceHistory(uint32_t symbol);
 };
 
 #endif // CONTEXTMODEL_HPP
