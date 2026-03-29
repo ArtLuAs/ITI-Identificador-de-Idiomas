@@ -1,4 +1,5 @@
 #include "headers/PPM.hpp"
+#include "headers/Interpretador.hpp"
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -10,37 +11,54 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-// ==== Função para rodar como ferramenta (Compressão Única) ====
-void rodarFerramenta(const string& modo, const string& input, const string& output, int order) {
+// ================================================================
+// Uso:
+//
+//  Comprimir:    ./main -c <entrada> <saida> [ordem=5]
+//  Descomprimir: ./main -d <entrada> <saida> [ordem=5]
+//
+//  Treinar:      ./main --treinar <corpus.txt> <modelo.model> [ordem=5]
+//                  Treina (ou incrementa) o modelo com o corpus.
+//                  Ex: ./main --treinar corpora/pt.txt modelos/pt.model 5
+//
+//  Identificar:  ./main --identificar <texto.txt> <pasta_modelos>
+//                  Identifica o idioma do texto usando os modelos salvos.
+//                  Ex: ./main --identificar entrada.txt modelos/
+//
+//  Benchmark:    ./main [ordem=4] [saida.csv]
+// ================================================================
+
+void rodarFerramenta(const string& modo, const string& input,
+                     const string& output, int order) {
     if (modo == "-c") {
-        cout << "Iniciando compressao de " << input << " (K=" << order << ")" << endl;
+        cout << "Iniciando compressao de " << input
+             << " (K=" << order << ")" << endl;
         ifstream inOriginal(input, ios::binary);
         if (!inOriginal.is_open()) {
             cerr << "ERRO: Arquivo nao encontrado: " << input << endl;
             return;
         }
-        string inputStr((istreambuf_iterator<char>(inOriginal)), istreambuf_iterator<char>());
+        string inputStr((istreambuf_iterator<char>(inOriginal)),
+                        istreambuf_iterator<char>());
         inOriginal.close();
 
         auto start = chrono::high_resolution_clock::now();
         compressPPM(inputStr, output, order);
-        auto end = chrono::high_resolution_clock::now();
-        
-        chrono::duration<double> duration = end - start;
-        cout << "Compressao concluida em " << duration.count() << " segundos." << endl;
-        
+        auto end   = chrono::high_resolution_clock::now();
+        chrono::duration<double> d = end - start;
+        cout << "Compressao concluida em " << d.count() << " segundos." << endl;
+
     } else if (modo == "-d") {
-        cout << "Iniciando descompressao de " << input << " (K=" << order << ")" << endl;
+        cout << "Iniciando descompressao de " << input
+             << " (K=" << order << ")" << endl;
         auto start = chrono::high_resolution_clock::now();
         decompressPPM(input, output, order);
-        auto end = chrono::high_resolution_clock::now();
-        
-        chrono::duration<double> duration = end - start;
-        cout << "Descompressao concluida em " << duration.count() << " segundos." << endl;
+        auto end   = chrono::high_resolution_clock::now();
+        chrono::duration<double> d = end - start;
+        cout << "Descompressao concluida em " << d.count() << " segundos." << endl;
     }
 }
 
-// ==== Função Original do Benchmark ====
 int rodarBenchmark(int argc, char* argv[]) {
     vector<string> listaArquivos = {
         "silesia/mr", "silesia/ooffice", "silesia/mozilla", "silesia/dickens",
@@ -49,114 +67,86 @@ int rodarBenchmark(int argc, char* argv[]) {
         "silesia/silesia.tar"
     };
 
-    int ordemK = (argc > 1) ? stoi(argv[1]) : 4;
+    int ordemK         = (argc > 1) ? stoi(argv[1]) : 4;
     string benchmarkCsv = (argc > 2) ? argv[2] : "";
 
     ofstream benchOut;
     if (!benchmarkCsv.empty()) {
         benchOut.open(benchmarkCsv, ios::app);
         if (!benchOut.is_open()) {
-            cerr << "ERRO: nao foi possivel abrir o CSV de benchmark: " << benchmarkCsv << endl;
+            cerr << "ERRO: nao foi possivel abrir o CSV: " << benchmarkCsv << endl;
             return 1;
         }
     }
 
-    uintmax_t totalOriginal = 0;
+    uintmax_t totalOriginal   = 0;
     uintmax_t totalComprimido = 0;
-    double totalTempoComp = 0.0;
-    double totalTempoDecomp = 0.0;
-    bool totalOk = true;
+    double totalTempoComp     = 0.0;
+    double totalTempoDecomp   = 0.0;
+    bool   totalOk            = true;
 
     for (const auto& nomeArquivo : listaArquivos) {
         cout << "\n=======================================================\n";
-        cout << "Processando arquivo: " << nomeArquivo << endl;
+        cout << "Processando: " << nomeArquivo << endl;
 
         fs::path caminho(nomeArquivo);
-        string stem = caminho.stem().string();
+        string stem    = caminho.stem().string();
         string extensao = caminho.extension().string();
+        string arqComp  = "saidas/" + stem + "_comprimido.bin";
+        string arqDecomp = "saidas/" + stem + "_descomprimido" + extensao;
 
-        string arquivoComprimido = "saidas/" + stem + "_comprimido.bin";
-        string arquivoDescomprimido = "saidas/" + stem + "_descomprimido" + extensao;
-
-        ifstream inOriginal(nomeArquivo, ios::binary);
-        if (!inOriginal.is_open()) {
-            cerr << "ERRO: Nao foi possivel abrir o arquivo original: " << nomeArquivo << endl;
+        ifstream inOrig(nomeArquivo, ios::binary);
+        if (!inOrig.is_open()) {
+            cerr << "ERRO: " << nomeArquivo << endl;
             totalOk = false;
             continue;
         }
+        string inputStr((istreambuf_iterator<char>(inOrig)),
+                        istreambuf_iterator<char>());
+        inOrig.close();
 
-        string inputStr((istreambuf_iterator<char>(inOriginal)), istreambuf_iterator<char>());
-        inOriginal.close();
+        auto t0 = chrono::high_resolution_clock::now();
+        compressPPM(inputStr, arqComp, ordemK);
+        auto t1 = chrono::high_resolution_clock::now();
+        decompressPPM(arqComp, arqDecomp, ordemK);
+        auto t2 = chrono::high_resolution_clock::now();
 
-        auto start_compress = chrono::high_resolution_clock::now();
-        cout << "-> Comprimindo para: " << arquivoComprimido << endl;
-        compressPPM(inputStr, arquivoComprimido, ordemK);
-        auto end_compress = chrono::high_resolution_clock::now();
+        chrono::duration<double> dComp   = t1 - t0;
+        chrono::duration<double> dDecomp = t2 - t1;
 
-        auto start_decompress = chrono::high_resolution_clock::now();
-        cout << "-> Descomprimindo para: " << arquivoDescomprimido << endl;
-        decompressPPM(arquivoComprimido, arquivoDescomprimido, ordemK);
-        auto end_decompress = chrono::high_resolution_clock::now();
-
-        ifstream inDescomprimido(arquivoDescomprimido, ios::binary);
-        if (!inDescomprimido.is_open()) {
-            cerr << "ERRO: Nao foi possivel abrir o arquivo gerado: " << arquivoDescomprimido << endl;
-            totalOk = false;
-            continue;
-        }
-
-        string resultStr((istreambuf_iterator<char>(inDescomprimido)), istreambuf_iterator<char>());
-        inDescomprimido.close();
+        ifstream inDecomp(arqDecomp, ios::binary);
+        string resultStr((istreambuf_iterator<char>(inDecomp)),
+                         istreambuf_iterator<char>());
+        inDecomp.close();
 
         bool ok = (inputStr == resultStr);
-        if (ok) {
-            cout << "SUCESSO: Compressao e descompressao validadas sem perdas!" << endl;
-        } else {
-            cout << "ERRO: Os dados recuperados diferem da entrada original." << endl;
-            totalOk = false;
-        }
-
-        chrono::duration<double> duration1 = end_compress - start_compress;
-        chrono::duration<double> duration2 = end_decompress - start_decompress;
-
-        double tempoComp = duration1.count();
-        double tempoDecomp = duration2.count();
-
-        cout << "DURACAO COMPRESSAO: " << tempoComp << endl;
-        cout << "DURACAO DESCOMPRESSAO: " << tempoDecomp << endl;
-        cout << "DURACAO TOTAL: " << (tempoComp + tempoDecomp) << endl;
+        cout << (ok ? "SUCESSO" : "ERRO") << endl;
 
         try {
-            auto tamanhoOriginal = fs::file_size(nomeArquivo);
-            auto tamanhoComprimido = fs::file_size(arquivoComprimido);
+            auto szOrig  = fs::file_size(nomeArquivo);
+            auto szComp  = fs::file_size(arqComp);
+            double bps   = (static_cast<double>(szComp) * 8.0) / szOrig;
+            double ratio = (static_cast<double>(szComp) / szOrig) * 100.0;
 
-            double bps = (static_cast<double>(tamanhoComprimido) * 8.0) / tamanhoOriginal;
-            double razaoCompressao = (static_cast<double>(tamanhoComprimido) / tamanhoOriginal) * 100.0;
+            cout << "BPC: " << fixed << setprecision(3) << bps
+                 << " | Razao: " << ratio << "%" << endl;
 
-            cout << "\n--- METRICAS DE COMPRESSAO ---" << endl;
-            cout << "Tamanho Original:    " << tamanhoOriginal << " bytes" << endl;
-            cout << "Tamanho Comprimido:  " << tamanhoComprimido << " bytes" << endl;
-            cout << "BPC (Bits per Char): " << fixed << setprecision(3) << bps << " bits/char" << endl;
-            cout << "Razao de Compressao: " << fixed << setprecision(2) << razaoCompressao << "% do tamanho original" << endl;
+            totalOriginal   += szOrig;
+            totalComprimido += szComp;
+            totalTempoComp  += dComp.count();
+            totalTempoDecomp += dDecomp.count();
 
-            totalOriginal += tamanhoOriginal;
-            totalComprimido += tamanhoComprimido;
-            totalTempoComp += tempoComp;
-            totalTempoDecomp += tempoDecomp;
-
-            if (benchOut.is_open()) {
+            if (benchOut.is_open())
                 benchOut << "PPM-C," << ordemK << "," << stem << ","
-                         << tamanhoOriginal << "," << tamanhoComprimido << ","
+                         << szOrig << "," << szComp << ","
                          << fixed << setprecision(6) << bps << ","
-                         << tempoComp << "," << tempoDecomp << ","
+                         << dComp.count() << "," << dDecomp.count() << ","
                          << (ok ? "OK" : "FAIL") << "\n";
-            }
-
         } catch (const fs::filesystem_error& e) {
-            cerr << "Erro ao calcular metricas de tamanho: " << e.what() << endl;
+            cerr << e.what() << endl;
             totalOk = false;
         }
-        cout << "=======================================================\n" << endl;
+        cout << "=======================================================\n";
     }
 
     if (benchOut.is_open() && totalOriginal > 0) {
@@ -167,33 +157,82 @@ int rodarBenchmark(int argc, char* argv[]) {
                  << totalTempoComp << "," << totalTempoDecomp << ","
                  << (totalOk ? "OK" : "FAIL") << "\n";
     }
-
     return 0;
 }
 
 int main(int argc, char* argv[]) {
     cout << unitbuf;
 
-    // Se receber -c ou -d, age como ferramenta
-    if (argc >= 4 && (string(argv[1]) == "-c" || string(argv[1]) == "-d")) {
-        string modo = argv[1];
-        string input = argv[2];
-        string output = argv[3];
-        int ordemK = (argc > 4) ? stoi(argv[4]) : 4;
-        
-        rodarFerramenta(modo, input, output, ordemK);
-        return 0;
-    } 
-    // Se receber "--help" ou não reconhecer o comando, mostra instrução rápida
-    else if (argc >= 2 && string(argv[1]) == "--help") {
-        cout << "Uso como ferramenta:" << endl;
-        cout << "  Comprimir:     ./main.exe -c <arquivo_in> <arquivo_out> [ordem=4]" << endl;
-        cout << "  Descomprimir:  ./main.exe -d <arquivo_in> <arquivo_out> [ordem=4]" << endl;
-        cout << "\nUso como benchmark (comportamento padrao):" << endl;
-        cout << "  ./main.exe [ordem=4] [csv_saida.csv]" << endl;
+    if (argc >= 2 && string(argv[1]) == "--treinar") {
+        // ./main --treinar <corpus> <modelo> [ordem=5]
+        if (argc < 4) {
+            cerr << "Uso: ./main --treinar <corpus.txt> <modelo.model> [ordem=5]" << endl;
+            return 1;
+        }
+        string corpus = argv[2];
+        string modelo = argv[3];
+        int ordem     = (argc > 4) ? stoi(argv[4]) : 5;
+        treinarModelo(corpus, modelo, ordem, true);
         return 0;
     }
-    
-    // Caso contrario, roda o comportamento original para nao quebrar os scripts ps1/py
+
+    if (argc >= 2 && string(argv[1]) == "--identificar") {
+        // ./main --identificar <texto.txt> <pasta_modelos>
+        if (argc < 4) {
+            cerr << "Uso: ./main --identificar <texto.txt> <pasta_modelos>" << endl;
+            return 1;
+        }
+        ifstream arqTexto(argv[2]);
+        if (!arqTexto.is_open()) {
+            cerr << "ERRO: Nao foi possivel abrir: " << argv[2] << endl;
+            return 1;
+        }
+        string texto((istreambuf_iterator<char>(arqTexto)),
+                     istreambuf_iterator<char>());
+        arqTexto.close();
+
+        string pastaModelos = argv[3];
+        cout << "\nAvaliando texto contra modelos em: " << pastaModelos << endl;
+        cout << "---------------------------------------" << endl;
+
+        auto resultados = avaliarTexto(texto, pastaModelos);
+
+        if (resultados.empty()) {
+            cerr << "Nenhum modelo encontrado ou erro na avaliacao." << endl;
+            return 1;
+        }
+
+        cout << "\n=== RESULTADO ==="  << endl;
+        for (size_t i = 0; i < resultados.size(); i++) {
+            cout << (i == 0 ? ">> " : "   ")
+                 << resultados[i].idioma
+                 << "  BPC: " << fixed << setprecision(4) << resultados[i].bpc
+                 << "  bits: " << fixed << setprecision(1) << resultados[i].bitsTotal
+                 << endl;
+        }
+        cout << "\nIdioma identificado: " << resultados.front().idioma << endl;
+        return 0;
+    }
+
+    if (argc >= 4 &&
+        (string(argv[1]) == "-c" || string(argv[1]) == "-d")) {
+        string modo   = argv[1];
+        string input  = argv[2];
+        string output = argv[3];
+        int ordemK    = (argc > 4) ? stoi(argv[4]) : 4;
+        rodarFerramenta(modo, input, output, ordemK);
+        return 0;
+    }
+
+    if (argc >= 2 && string(argv[1]) == "--help") {
+        cout << "Uso:\n"
+             << "  Treinar:      ./main --treinar <corpus.txt> <modelo.model> [ordem=5]\n"
+             << "  Identificar:  ./main --identificar <texto.txt> <pasta_modelos>\n"
+             << "  Comprimir:    ./main -c <entrada> <saida> [ordem=5]\n"
+             << "  Descomprimir: ./main -d <entrada> <saida> [ordem=5]\n"
+             << "  Benchmark:    ./main [ordem=4] [saida.csv]\n";
+        return 0;
+    }
+
     return rodarBenchmark(argc, argv);
 }
