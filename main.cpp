@@ -42,12 +42,14 @@ void rodarFerramenta(const string& modo, const string& input, const string& outp
 
 // ==== Função Original do Benchmark ====
 int rodarBenchmark(int argc, char* argv[]) {
-    vector<string> listaArquivos = {
-        "silesia/mr", "silesia/ooffice", "silesia/mozilla", "silesia/dickens",
-        "silesia/xml", "silesia/osdb", "silesia/x-ray", "silesia/reymont",
-        "silesia/nci", "silesia/samba", "silesia/webster", "silesia/sao",
-        "silesia/silesia.tar"
-    };
+    // vector<string> listaArquivos = {
+    //     "silesia/mr", "silesia/ooffice", "silesia/mozilla", "silesia/dickens",
+    //     "silesia/xml", "silesia/osdb", "silesia/x-ray", "silesia/reymont",
+    //     "silesia/nci", "silesia/samba", "silesia/webster", "silesia/sao",
+    //     "silesia/silesia.tar"
+    // };
+
+    vector<string> listaArquivos = {"entrada.txt"};
 
     int ordemK = (argc > 1) ? stoi(argv[1]) : 4;
     string benchmarkCsv = (argc > 2) ? argv[2] : "";
