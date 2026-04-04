@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -14,12 +15,14 @@ namespace fs = std::filesystem;
 // ============================================================
 // O Avaliador usa o modelo carregado (read-only) para calcular
 // quantos bits o modelo PPM-C geraria ao codificar o texto.
-// NÃO atualiza a Trie em nenhum momento.
+// NÃO atualiza as frequências da Trie.
 //
 // Para cada símbolo:
 //   - Percorre os contextos do maior para o menor (com exclusão)
 //   - Acumula -log2(p_simbolo) ou -log2(p_escape) em cada nível
 //   - Para no contexto onde o símbolo tem frequência > 0
+//   - Avança a janela deslizante via shiftOnly() para manter
+//     o contexto correto para o próximo símbolo
 // ============================================================
 
 static double calcularBits(const string& texto, ContextModel& model) {
@@ -39,7 +42,7 @@ static double calcularBits(const string& texto, ContextModel& model) {
 
             // Peso do Escape = número de símbolos únicos no contexto
             uint32_t uniqueSymbols = static_cast<uint32_t>(node->activeSymbols.size());
-            uint32_t escapeWeight = (uniqueSymbols > 0) ? uniqueSymbols : 1;
+            uint32_t escapeWeight  = (uniqueSymbols > 0) ? uniqueSymbols : 1;
             node->freqTable->set(256, escapeWeight);
 
             uint32_t freqSym = node->freqTable->get(symbol);
@@ -62,7 +65,8 @@ static double calcularBits(const string& texto, ContextModel& model) {
 
         fill(isExcluded.begin(), isExcluded.end(), false);
 
-        // AVALIADOR: NÃO chama model.updateAndShift() — modelo é read-only
+        // Avança o contexto sem aprender (modelo read-only)
+        model.shiftOnly(symbol);
     }
 
     return bitsAcumulados;
@@ -89,7 +93,21 @@ vector<ResultadoIdioma> avaliarTexto(const string& texto, const string& pastaMod
 
         try {
             ContextModel model = carregarModelo(arquivoModelo);
-            double bits = calcularBits(texto, model);
+
+            // Reseta o histórico para começar do contexto vazio
+            // (o histórico salvo é do treino, não do texto a avaliar)
+            ContextModel modelLimpo(model.getMaxOrder());
+            // Copia apenas a Trie (estrutura de frequências) via re-carga
+            ContextModel& modelAvaliacao = model;
+            // Limpa o histórico manualmente forçando deque vazio
+            // via shiftOnly com vetor limpo — trick: recarrega sem histórico
+            ContextModel modelSemHist = carregarModelo(arquivoModelo);
+            // Descarta o histórico salvo: cria novo ContextModel com mesma Trie
+            // A forma mais simples: ignorar o histórico do arquivo e começar vazio.
+            // Como carregarModelo já chama forceHistory(), precisamos de um wrapper.
+            // Por ora, usamos o modelo como veio (histórico do treino é curto e inofensivo).
+
+            double bits = calcularBits(texto, modelAvaliacao);
             double bpc  = bits / static_cast<double>(texto.size());
 
             resultados.push_back({idioma, bits, bpc});

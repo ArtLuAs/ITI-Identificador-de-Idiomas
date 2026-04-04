@@ -50,6 +50,13 @@ void ContextModel::updateAndShift(uint32_t symbol) {
         history.pop_front();
 }
 
+void ContextModel::shiftOnly(uint32_t symbol) {
+    // Avança o histórico sem tocar nas frequências da Trie
+    history.push_back(symbol);
+    if (history.size() > static_cast<size_t>(maxOrder))
+        history.pop_front();
+}
+
 void ContextModel::forceHistory(uint32_t symbol) {
     history.push_back(symbol);
     if (history.size() > static_cast<size_t>(maxOrder))

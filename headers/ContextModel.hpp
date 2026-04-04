@@ -22,6 +22,9 @@ public:
     // Atualiza frequências na Trie e avança a janela deslizante (uso do Interpretador)
     void updateAndShift(uint32_t symbol);
 
+    // Apenas avança a janela deslizante SEM atualizar frequências (uso do Avaliador)
+    void shiftOnly(uint32_t symbol);
+
     // ---- Acesso para serialização (ModeloPersistente) ----
     int getMaxOrder() const { return maxOrder; }
     const std::deque<uint32_t>& getHistory() const { return history; }
