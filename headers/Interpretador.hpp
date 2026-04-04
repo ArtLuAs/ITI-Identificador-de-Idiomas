@@ -9,15 +9,17 @@
 // (aprendizado incremental: aprende, salva, aprende, salva...).
 //
 // Parâmetros:
-//   corpusFile   - caminho para o arquivo de texto de treinamento
-//   arquivoModelo- caminho de saída/entrada do arquivo .model
-//   order        - ordem k do PPM (padrão recomendado: 5)
-//   verbose      - imprime progresso a cada bloco processado
+//   corpusFile    - caminho para o arquivo de texto de treinamento
+//   arquivoModelo - caminho de saída/entrada do arquivo .model
+//   order         - ordem k do PPM (padrão recomendado: 5)
+//   verbose       - imprime progresso a cada bloco processado
+//
+// Nota: os valores padrão de order e verbose estão declarados em PPM.hpp.
 void treinarModelo(
     const std::string& corpusFile,
     const std::string& arquivoModelo,
-    int order = 5,
-    bool verbose = true
+    int order,
+    bool verbose
 );
 
 #endif // INTERPRETADOR_HPP
