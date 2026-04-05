@@ -197,22 +197,28 @@ int main(int argc, char* argv[]) {
         cout << "\nAvaliando texto contra modelos em: " << pastaModelos << endl;
         cout << "---------------------------------------" << endl;
 
+        auto start = chrono::high_resolution_clock::now();
         auto resultados = avaliarTexto(texto, pastaModelos);
+        auto end   = chrono::high_resolution_clock::now();
 
         if (resultados.empty()) {
             cerr << "Nenhum modelo encontrado ou erro na avaliacao." << endl;
             return 1;
         }
 
+        
         cout << "\n=== RESULTADO ==="  << endl;
         for (size_t i = 0; i < resultados.size(); i++) {
             cout << (i == 0 ? ">> " : "   ")
-                 << resultados[i].idioma
-                 << "  BPC: " << fixed << setprecision(4) << resultados[i].bpc
-                 << "  bits: " << fixed << setprecision(1) << resultados[i].bitsTotal
-                 << endl;
+            << resultados[i].idioma
+            << "  BPC: " << fixed << setprecision(4) << resultados[i].bpc
+            << "  bits: " << fixed << setprecision(1) << resultados[i].bitsTotal
+            << endl;
         }
         cout << "\nIdioma identificado: " << resultados.front().idioma << endl;
+        
+        chrono::duration<double> d = end - start;
+        cout << "Teste concluido: " << d.count() << " segundos." << endl;
         return 0;
     }
 
