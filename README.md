@@ -40,9 +40,8 @@ A identificação de idiomas foi modelada como um problema de compressão de dad
 ### Arquitetura do Sistema:
 O sistema é composto por três módulos principais, estruturados em torno de uma árvore de contextos (Trie):
 
-- **Treinamento (`interpretador.cpp`)**: Processa os corpora de cada um dos 27 idiomas, alimentando a árvore de contextos (Trie + Árvore de Fenwick) e ajustando as probabilidades dos caracteres. Para evitar overflow com grandes volumes de dados, as frequências passam por um mecanismo de *aging* (halving) quando atingem um limite predefinido.
-- **Persistência (`modelopersistente`)**: Para evitar o reprocessamento dos corpora a cada execução, este módulo serializa a Trie em disco, salvando os modelos consolidados de cada idioma no diretório `models/`. O total de modelos gerados ocupa aproximadamente **6 GB**.
-- **Identificação (`avaliador.cpp`)**: Carrega os 27 modelos do diretório `models/` e calcula o custo de codificação (BPC) do texto de entrada frente a cada um. O idioma identificado é aquele que apresentar o menor valor de BPC.
+- **Treinamento (`--treinar`)**: Processa o corpus de um idioma, alimentando a árvore de contextos (Trie + Árvore de Fenwick) e salvando o modelo resultante em disco no diretório `modelos/`.
+- **Identificação (`--identificar`)**: Carrega todos os modelos do diretório `modelos/` e calcula o BPC do texto de entrada frente a cada um. O idioma identificado é aquele com o menor custo em bits por caractere.
 - **Ordem de Contexto**: A profundidade máxima de contexto adotada foi $K_{max}=4$, definida em função das limitações de hardware disponível. Valores maiores de $K$ aumentam a acurácia em textos longos, porém elevam significativamente o tamanho da Trie e o tempo de processamento.
 
 ### Idiomas Analisados:
@@ -51,7 +50,7 @@ Foram analisados **27 idiomas** baseados no alfabeto latino, categorizados por f
 | Família | Idiomas |
 |---|---|
 | **Românicas** | Português, Espanhol, Francês, Italiano, Catalão, Galego, Corso, Valão |
-| **Germânicas** | Inglês, Alemão, Holandês, Sueco, Dinamarquês, Norueguês, Islandês, Faroense, Afrikaans, Luxemburguês |
+| **Germânicas** | Inglês, Alemão, Holandês, Sueco, Dinamarquês, Norueguês, Islandés, Faroense, Afrikaans, Luxemburguês |
 | **Fino-Úgricas** | Finlandês, Estoniano |
 | **Célticas** | Irlandês, Bretão |
 | **Austronésias** | Indonésio, Tagalo |
@@ -65,7 +64,11 @@ Os corpora de treinamento foram extraídos de duas fontes abertas:
 
 ## :abc: Dependências
 
-Este projeto foi desenvolvido utilizando apenas a **biblioteca padrão do C++ (STL)**, sem dependências externas. O módulo de pós-processamento e geração de gráficos utiliza **Python 3** com as bibliotecas `matplotlib` e `pandas`.
+Este projeto foi desenvolvido utilizando apenas a **biblioteca padrão do C++ (STL)**, sem dependências externas. O pré-processamento dos corpora utiliza **Python 3**.
+
+```sh
+pip install -r tools/requirements.txt
+```
 
 ### Biblioteca Padrão C++
 
@@ -90,23 +93,14 @@ Este projeto foi desenvolvido utilizando apenas a **biblioteca padrão do C++ (S
 
 ```text
 .
-├── documentos/                     # Relatório e apresentação do projeto
-├── models/                         # Modelos treinados por idioma (gerados pelo interpretador)
-├── headers/
-│   ├── ArithmeticCoder.hpp         # Codificação aritmética (bits e codificador/decodificador)
-│   ├── ContextModel.hpp            # Modelo de contextos PPM (Trie e gerenciamento)
-│   ├── tabelaFrequencia.hpp        # Tabelas de frequência com Fenwick Tree e exclusão
-│   └── TrieNode.hpp                # Nó da Trie com frequências e filhos
-├── src/
-│   ├── ArithmeticCoder.cpp         # Implementação da E/S de bits e codificação
-│   ├── ContextModel.cpp            # Gerenciamento da árvore de contextos
-│   ├── tabelaFrequencia.cpp        # Operações nas tabelas de frequência
-│   └── TrieNode.cpp                # Manipulação dos nós da Trie
-├── interpretador.cpp               # Treinamento: lê corpora e gera os arquivos .model
-├── modelopersistente.cpp           # Serialização/desserialização da Trie em disco
-├── avaliador.cpp                   # Identificação: calcula BPC e aponta o idioma
-├── treinar_todos.sh                # Script para treinar todos os 27 idiomas em sequência
-├── plotar_resultados.py            # Geração dos gráficos de BPC por idioma
+├── data input/                     # Textos de entrada para identificação
+├── modelos/                        # Modelos treinados por idioma (gerados pelo --treinar)
+├── headers/                        # Arquivos de cabeçalho C++
+├── src/                            # Implementações C++
+├── tools/                          # Scripts Python para pré-processamento dos corpora
+├── main.cpp                        # Ponto de entrada: --treinar e --identificar
+├── run.sh                          # Script para treinar um idioma (Linux/macOS)
+├── run.bat                         # Script para treinar um idioma (Windows)
 └── README.md                       # Este arquivo
 ```
 
@@ -164,76 +158,57 @@ Responsáveis por ler e escrever bits individuais em fluxos de bytes.
 
 #### Requisitos
 - Compilador C++ (`g++` ou `clang++`)
-- Terminal de linha de comando
-- Python 3 com `matplotlib` e `pandas` para geração dos gráficos
+- Python 3
+
+---
+
+### Compilação
 
 ```sh
-pip install matplotlib pandas
+g++ main.cpp ./src/*.cpp -o interpretador
 ```
 
 ---
 
 ### Etapa 1 — Treinamento (gerar os modelos)
 
-Compile o interpretador:
+Antes de treinar, o corpus precisa ser pré-processado pelo script Python. Edite a variável `idioma` no topo do `run.sh` (ou `run.bat`) para o código do idioma desejado e execute:
 
 ```sh
-# Linux / Git Bash / WSL
-g++ src/*.cpp interpretador.cpp modelopersistente.cpp -o interpretador -O2
-
-# Windows (PowerShell)
-g++ src/*.cpp interpretador.cpp modelopersistente.cpp -o interpretador.exe -O2
+# Linux / macOS / Git Bash
+bash run.sh
 ```
 
-Treine um idioma específico (ex: Português):
+```bat
+rem Windows
+run.bat
+```
+
+O script realiza automaticamente:
+1. O pré-processamento do corpus via `tools/main.py`
+2. A compilação do C++
+3. O treinamento do modelo com o comando:
 
 ```sh
-./interpretador corpus/por.txt models/por.model 4
+./interpretador --treinar "corpora/<idioma>.txt" "modelos/<idioma>.model" 4
 ```
 
-Ou treine todos os idiomas de uma vez usando o script:
-
-```sh
-bash treinar_todos.sh
-```
-
-> O parâmetro final (`4`) é o valor de $K_{max}$. Os modelos gerados ficam no diretório `models/` e ocupam cerca de **6 GB** no total.
+Repita o processo para cada idioma desejado. Os modelos ficam salvos em `modelos/`.
 
 ---
 
-### Etapa 2 — Identificação (avaliar um texto)
+### Etapa 2 — Identificação
 
-Compile o avaliador:
-
-```sh
-# Linux / Git Bash / WSL
-g++ src/*.cpp avaliador.cpp modelopersistente.cpp -o avaliador -O2
-
-# Windows (PowerShell)
-g++ src/*.cpp avaliador.cpp modelopersistente.cpp -o avaliador.exe -O2
-```
-
-Execute a identificação:
+Com os modelos já treinados, execute:
 
 ```sh
-# Linux
-./avaliador "Eu amo Teoria da Informação!" models/ 4
+# Identificar a partir de uma string direta
+./interpretador --identificar "Seu texto aqui" modelos/
 
-# Windows
-./avaliador.exe "Eu amo Teoria da Informação!" models/ 4
+# Identificar a partir de um arquivo
+./interpretador --identificar "data input/teste.txt" modelos/
 ```
 
-O sistema calculará o BPC do texto frente a cada um dos 27 modelos e exibirá o idioma identificado, além da lista completa de idiomas ordenada por custo.
+O programa calculará o BPC do texto frente a todos os modelos em `modelos/` e exibirá o idioma identificado, além do ranking completo por custo.
 
----
-
-### Etapa 3 — Geração dos gráficos
-
-Após executar o avaliador e exportar os resultados em `.txt`:
-
-```sh
-python3 plotar_resultados.py   # Linux / macOS
-python  plotar_resultados.py   # Windows
-```
-
-**OBS.:** Utilizamos barra normal (`/`) considerando ambientes como Git Bash, WSL e PowerShell. Em caso de problemas no Windows com `cmd.exe`, substitua por barra invertida (`\`).
+**OBS.:** Utilizamos barra normal (`/`) considerando ambientes como Git Bash, WSL e PowerShell. Em caso de problemas no `cmd.exe`, substitua por barra invertida (`\`).
