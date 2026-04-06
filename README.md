@@ -1,63 +1,58 @@
-# :package::page_facing_up: ITI PPM-C
+# :earth_americas::mag_right: ITI Identificador de Idiomas (PPM-C)
 
 - ### [:dart: Objetivo](#dart-objetivo-1)
-- ### [:package: Sobre o Projeto](#package-sobre-o-projeto-1)
-- ### [:clamp: Dependências](#clamp-dependências-1)
+- ### [:world_map: Sobre o Projeto](#world_map-sobre-o-projeto-1)
+- ### [:abc: Dependências](#abc-dependências-1)
 - ### [:file_folder: Documentação](#file_folder-documentação-1)
 - ### [:gear: Como rodar](#gear-como-rodar-1)
-- ### [:arrow_down: Baixar o projeto](https://github.com/ArtLuAs/ITI-PPM-C/archive/refs/heads/main.zip)
+- ### [:arrow_down: Baixar o projeto](https://github.com/ArtLuAs/ITI-Identificador-de-Idiomas/archive/refs/heads/main.zip)
 
 ## Disciplina de Introdução à Teoria da Informação
 
 Esse foi um projeto desenvolvido por discentes do curso de *Engenharia da Computação da Universidade Federal da Paraíba*, curso este que pertence ao *[Centro de Informática](http://ci.ufpb.br/)*, localizado na *[Rua dos Escoteiros S/N - Mangabeira - João Pessoa - Paraíba - Brasil](https://g.co/kgs/xobLzCE)*. O projeto implementa um sistema que consiste em um compressor e descompressor baseado no algoritmo PPM-C, otimizado para fontes não estacionárias através de adaptação dinâmica com monitoramento de performance e reset de tabelas de frequências. A avaliação do projeto, realizada pelo docente, foi realizada por meio da verificação do funcionamento do projeto e a da validação dos resultados.
 
-### :package: Autores:
+### :earth_americas: Autores:
 
--  :floppy_disk:  *[Arthur Maximus Cavalcante Beuttenmuller](https://github.com/Maximusthr)*
--  :floppy_disk:  *[Eduardo Asfuri Carvalho](https://github.com/Asfuri)*
--  :floppy_disk:  *[Lucas Henrique Vieira da Silva](https://github.com/hvslucas)*
+-  :luggage:  *[Arthur Maximus Cavalcante Beuttenmuller](https://github.com/Maximusthr)*
+-  :luggage:  *[Eduardo Asfuri Carvalho](https://github.com/Asfuri)*
+-  :luggage:  *[Lucas Henrique Vieira da Silva](https://github.com/hvslucas)*
 
-###  :package: Docente:
+###  :earth_americas: Docente:
 
--  :floppy_disk: Leonardo Vidal Batista
+:luggage: Leonardo Vidal Batista
 
 <p align="center">
   <a href="#page_facing_up-package-iti-ppm-c-1">
-    <img src="https://github.com/user-attachments/assets/afe0db6c-c063-4e8f-b00d-d8f7b6930a1d" alt="winrar2" width="600">
+    <img alt="C-3PO_droid" src="https://github.com/user-attachments/assets/bd3e166f-8032-4981-952b-7257628e9355" width="228" height="437" />
   </a>
 </p>
 
 
 ## :dart: Objetivo:
 
-Este repositório apresenta a implementação de um sistema de compressão e descompressão baseado no algoritmo PPM-C, isto é, Codificador Artimético combinado com um Modelo Probabilístico Contextual Adaptativo Incremental, com mecanismo de exclusão, para fontes de informação cujos símbolos são bytes (0–255). O projeto tem como foco avaliar a eficiência do modelo em fontes não estacionárias, incorporando mecanismos de adaptação dinâmica. Para os testes que validam esse comportamento, o Corpus Silesia foi utilizado como conjunto de arquivos de entrada.[^1]
+O objetivo geral deste trabalho foi desenvolver e avaliar um identificador de idiomas que se adequam especificamente à codificação ASCII 256, utilizando o algoritmo PPM-C. O estudo foca em mapear quais línguas se adequam perfeitamente a esse limite sem sofrer perda de informação ou requerer codificações mais complexas (como o UTF-8). Os experimentos foram conduzidos utilizando corpora textuais abrangendo 27 idiomas.
 
 [^1]: ***[Corpus Silesia](https://sun.aei.polsl.pl/~sdeor/index.php?page=silesia)***
 
-## :package: Sobre o Projeto
+## :world_map: Sobre o Projeto
 
-### Arquitetura e Estruturas de Dados:
+### Modelagem e Entropia Cruzada:
+A identificação de idiomas foi modelada como um problema de compressão de dados. O modelo calcula a entropia cruzada de um texto de entrada frente aos modelos previamente treinados. A taxa real de custo é calculada através de bits por caractere (BPC). O idioma que resultar no menor comprimento médio é assumido como o idioma real do texto, indicando que seu modelo previu a sequência com maior exatidão.
 
-Para alcançar essa alta performance e adaptabilidade, a arquitetura do sistema emprega uma árvore de prefixos (Trie) para gerenciar os múltiplos contextos gerados pela ordem variável ($K_{max}$). Cada nó dessa estrutura gerencia sua própria tabela de frequências utilizando Árvores de Fenwick (Binary Indexed Trees), o que garante o cálculo de probabilidades cumulativas e a atualização do modelo em tempo logarítmico. O codificador opera sobre um alfabeto estendido de 259 símbolos, acomodando os 256 bytes originais e caracteres exclusivos de controle: Escape (256), EOF (257) e Reset (258).
+### Arquitetura do Sistema:
+A arquitetura de compressão foi dividida em duas etapas principais, estruturadas através de uma árvore de contextos (Trie):
 
-- Codificação Aritmética: O sistema utiliza o codificador aritmético de referência de Nayuki para a geração do fluxo de bits final.
-- Árvore de Contextos (Trie): O modelo probabilístico é estruturado através de uma árvore de prefixos (Trie) para gerenciar os diferentes contextos ativos baseados na janela deslizante de ordem máxima variável (Kmax).
-- Árvore de Fenwick: Para garantir altíssima performance, cada nó da Trie gerencia sua tabela de frequências utilizando uma Árvore de Fenwick (Binary Indexed Tree), permitindo atualizações e cálculos de frequência cumulativa em tempo logarítmico O(log N).
-- Alfabeto Estendido: A tabela de frequências rastreia 259 símbolos distintos: os 256 bytes originais, um símbolo de Escape (256), um símbolo de EOF para fim de arquivo (257) e um símbolo de Reset (258) exclusivo para controle interno.
+- **Treinamento (`interpretador.cpp`)**: Módulo responsável por processar os extensos corpora de cada um dos 27 idiomas, alimentando a árvore de contextos e ajustando as probabilidades.
+- **Persistência (`modelopersistente`)**: Para evitar reprocessamento, um código auxiliar serializa as informações da Trie em disco, salvando os modelos em um diretório `models/`.
+- **Identificação (`avaliador.cpp`)**: Quando uma nova frase é submetida, este módulo carrega os modelos treinados e calcula o custo de codificação, prevendo o idioma de origem com base no menor custo em bits/char.
+- **Ordem de Contexto**: Para viabilizar a execução dentro das limitações computacionais de hardware, a profundidade da memória do contexto adotada foi restrita a $K_{max}=4$.
 
-Mecanismos de Adaptação Dinâmica:
+### Bases de Dados:
+Foram analisados idiomas de diversas famílias linguísticas (Românicas, Germânicas, Célticas, etc.) utilizando dados de duas fontes abertas:
+- **Projeto Tatoeba**: Extração de sentenças curtas e estruturadas.
+- **Leipzig Corpora Collection**: Volumes massivos de dados, priorizando recortes de aproximadamente 100 mil linhas de notícias e Wikipédia por idioma.
 
-- Princípio de Exclusão: O algoritmo implementa exclusões temporais nos contextos. Se um símbolo não pode ser codificado na ordem atual, emite-se o Escape, excluem-se os símbolos já verificados da contagem de probabilidade da ordem inferior, otimizando o peso matemático do modelo.
-- Controle de Envelhecimento (Aging): Para prevenir overflows numéricos e manter o modelo adaptado a tendências recentes, as frequências de um nó são divididas pela metade (rescaling) sempre que a soma total atinge o limite de 16.384.
-- Monitoramento de Taxa e Estratégia de Reset: O compressor avalia seu próprio desempenho medindo o comprimento médio (bits/símbolo) em janelas adjacentes de tamanho j = 5000 símbolos. Utilizando uma média móvel exponencial para suavizar a leitura, o sistema aciona uma limpeza total (Reset) da árvore caso a janela atual sofra uma degradação maior que 20% em relação à média acumulada e o custo ultrapasse 5,0 bits/símbolo. O envio do caractere de escape 258 garante a sincronia imediata do descompressor.
-
-Análise e Avaliação:
-
-- Corpus Silesia: A avaliação de desempenho e estacionariedade do sistema foi validada utilizando a base de dados Corpus Silesia, padrão ouro na literatura.
-- Métricas Progressivas: O programa em C++ exporta periodicamente arquivos CSV contendo o comprimento médio em janelas, BPS acumulado e as entropias empíricas de ordem 0 e k.
-- Pós-processamento: Scripts em Python, utilizando Pandas e Matplotlib, são empregados para gerar gráficos do Comprimento Médio Progressivo, permitindo analisar visualmente onde a compressão sofre com mudanças de contexto e como o Reset recupera a eficiência.
-
-## :clamp: Dependências
+## :abc: Dependências
 
 Este projeto foi desenvolvido utilizando apenas a biblioteca padrão do C++ (STL), sem dependências externas. Abaixo, destacamos as principais bibliotecas utilizadas e sua aplicação no sistema de compressão PPM com codificação aritmética.
 
