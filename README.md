@@ -9,7 +9,7 @@
 
 ## Disciplina de Introdução à Teoria da Informação
 
-Esse foi um projeto desenvolvido por discentes do curso de *Engenharia da Computação da Universidade Federal da Paraíba*, curso este que pertence ao *[Centro de Informática](http://ci.ufpb.br/)*, localizado na *[Rua dos Escoteiros S/N - Mangabeira - João Pessoa - Paraíba - Brasil](https://g.co/kgs/xobLzCE)*. O projeto implementa um sistema que consiste em um compressor e descompressor baseado no algoritmo PPM-C, otimizado para fontes não estacionárias através de adaptação dinâmica com monitoramento de performance e reset de tabelas de frequências. A avaliação do projeto, realizada pelo docente, foi realizada por meio da verificação do funcionamento do projeto e a da validação dos resultados.
+Esse foi um projeto desenvolvido por discentes do curso de *Engenharia da Computação da Universidade Federal da Paraíba*, curso este que pertence ao *[Centro de Informática](http://ci.ufpb.br/)*, localizado na *[Rua dos Escoteiros S/N - Mangabeira - João Pessoa - Paraíba - Brasil](https://g.co/kgs/xobLzCE)*. O projeto implementa um sistema identificador de idiomas baseado no algoritmo PPM-C, que utiliza entropia cruzada para determinar, a partir de modelos estatísticos previamente treinados, qual idioma melhor se ajusta a um texto de entrada. A avaliação do projeto, realizada pelo docente, foi realizada por meio da verificação do funcionamento do projeto e da validação dos resultados.
 
 ### :earth_americas: Autores:
 
@@ -30,66 +30,58 @@ Esse foi um projeto desenvolvido por discentes do curso de *Engenharia da Comput
 
 ## :dart: Objetivo:
 
-O objetivo geral deste trabalho foi desenvolver e avaliar um identificador de idiomas que se adequam especificamente à codificação ASCII 256, utilizando o algoritmo PPM-C. O estudo foca em mapear quais línguas se adequam perfeitamente a esse limite sem sofrer perda de informação ou requerer codificações mais complexas (como o UTF-8). Os experimentos foram conduzidos utilizando corpora textuais abrangendo 27 idiomas.
-
-[^1]: ***[Corpus Silesia](https://sun.aei.polsl.pl/~sdeor/index.php?page=silesia)***
+O objetivo geral deste trabalho foi desenvolver e avaliar um identificador de idiomas que se adequam especificamente à codificação ASCII Estendido (256 caracteres), utilizando o algoritmo PPM-C. O estudo foca em mapear quais línguas se adequam perfeitamente a esse limite sem sofrer perda de informação ou requerer codificações mais complexas (como o UTF-8). Os experimentos foram conduzidos utilizando corpora textuais abrangendo 27 idiomas de diversas famílias linguísticas.
 
 ## :world_map: Sobre o Projeto
 
 ### Modelagem e Entropia Cruzada:
-A identificação de idiomas foi modelada como um problema de compressão de dados. O modelo calcula a entropia cruzada de um texto de entrada frente aos modelos previamente treinados. A taxa real de custo é calculada através de bits por caractere (BPC). O idioma que resultar no menor comprimento médio é assumido como o idioma real do texto, indicando que seu modelo previu a sequência com maior exatidão.
+A identificação de idiomas foi modelada como um problema de compressão de dados, onde busca-se representar uma sequência de símbolos usando o menor número possível de bits. O modelo calcula a **entropia cruzada** de um texto de entrada frente a cada um dos modelos de idioma previamente treinados. A taxa de custo é expressa em **bits por caractere (BPC)**. O idioma que resultar no menor BPC é assumido como o idioma real do texto, indicando que seu modelo previu a sequência de caracteres com maior exatidão.
 
 ### Arquitetura do Sistema:
-A arquitetura de compressão foi dividida em duas etapas principais, estruturadas através de uma árvore de contextos (Trie):
+O sistema é composto por três módulos principais, estruturados em torno de uma árvore de contextos (Trie):
 
-- **Treinamento (`interpretador.cpp`)**: Módulo responsável por processar os extensos corpora de cada um dos 27 idiomas, alimentando a árvore de contextos e ajustando as probabilidades.
-- **Persistência (`modelopersistente`)**: Para evitar reprocessamento, um código auxiliar serializa as informações da Trie em disco, salvando os modelos em um diretório `models/`.
-- **Identificação (`avaliador.cpp`)**: Quando uma nova frase é submetida, este módulo carrega os modelos treinados e calcula o custo de codificação, prevendo o idioma de origem com base no menor custo em bits/char.
-- **Ordem de Contexto**: Para viabilizar a execução dentro das limitações computacionais de hardware, a profundidade da memória do contexto adotada foi restrita a $K_{max}=4$.
+- **Treinamento (`interpretador.cpp`)**: Processa os corpora de cada um dos 27 idiomas, alimentando a árvore de contextos (Trie + Árvore de Fenwick) e ajustando as probabilidades dos caracteres. Para evitar overflow com grandes volumes de dados, as frequências passam por um mecanismo de *aging* (halving) quando atingem um limite predefinido.
+- **Persistência (`modelopersistente`)**: Para evitar o reprocessamento dos corpora a cada execução, este módulo serializa a Trie em disco, salvando os modelos consolidados de cada idioma no diretório `models/`. O total de modelos gerados ocupa aproximadamente **6 GB**.
+- **Identificação (`avaliador.cpp`)**: Carrega os 27 modelos do diretório `models/` e calcula o custo de codificação (BPC) do texto de entrada frente a cada um. O idioma identificado é aquele que apresentar o menor valor de BPC.
+- **Ordem de Contexto**: A profundidade máxima de contexto adotada foi $K_{max}=4$, definida em função das limitações de hardware disponível. Valores maiores de $K$ aumentam a acurácia em textos longos, porém elevam significativamente o tamanho da Trie e o tempo de processamento.
+
+### Idiomas Analisados:
+Foram analisados **27 idiomas** baseados no alfabeto latino, categorizados por família linguística:
+
+| Família | Idiomas |
+|---|---|
+| **Românicas** | Português, Espanhol, Francês, Italiano, Catalão, Galego, Corso, Valão |
+| **Germânicas** | Inglês, Alemão, Holandês, Sueco, Dinamarquês, Norueguês, Islandês, Faroense, Afrikaans, Luxemburguês |
+| **Fino-Úgricas** | Finlandês, Estoniano |
+| **Célticas** | Irlandês, Bretão |
+| **Austronésias** | Indonésio, Tagalo |
+| **Níger-Congo** | Suaíli |
+| **Isoladas / Outros** | Basco, Albanês |
 
 ### Bases de Dados:
-Foram analisados idiomas de diversas famílias linguísticas (Românicas, Germânicas, Célticas, etc.) utilizando dados de duas fontes abertas:
-- **Projeto Tatoeba**: Extração de sentenças curtas e estruturadas.
-- **Leipzig Corpora Collection**: Volumes massivos de dados, priorizando recortes de aproximadamente 100 mil linhas de notícias e Wikipédia por idioma.
+Os corpora de treinamento foram extraídos de duas fontes abertas:
+- **[Projeto Tatoeba](https://tatoeba.org/)**: Extração de sentenças curtas e variadas do cotidiano.
+- **[Leipzig Corpora Collection](https://wortschatz.uni-leipzig.de/)** (Universidade de Leipzig): Volumes massivos de notícias e artigos da Wikipédia, com preferência por recortes de aproximadamente **100 mil linhas** por idioma.
 
 ## :abc: Dependências
 
-Este projeto foi desenvolvido utilizando apenas a biblioteca padrão do C++ (STL), sem dependências externas. Abaixo, destacamos as principais bibliotecas utilizadas e sua aplicação no sistema de compressão PPM com codificação aritmética.
+Este projeto foi desenvolvido utilizando apenas a **biblioteca padrão do C++ (STL)**, sem dependências externas. O módulo de pós-processamento e geração de gráficos utiliza **Python 3** com as bibliotecas `matplotlib` e `pandas`.
 
-### Biblioteca Padrão
+### Biblioteca Padrão C++
 
-- **`<iostream>`**: Utilizada para operações básicas de entrada e saída no terminal, como exibir mensagens de progresso, resultados de compressão/descompressão e logs de depuração.
-  - **Implementação:** Durante a execução dos programas `compress` e `decompress`, mensagens são impressas para informar o usuário sobre o andamento do processo, taxas de compressão e possíveis eventos como reset do modelo.
-
-- **`<fstream>`**: Fornece funcionalidades para leitura e escrita de arquivos binários, essenciais para manipular os dados de entrada (texto original) e gerar o arquivo comprimido.
-  - **Implementação:** No compressor, o texto de entrada é lido via `ifstream` e o fluxo de bits comprimido é escrito em um arquivo binário através de `ofstream`. O descompressor realiza a operação inversa.
-
-- **`<string>`** e **`<string_view>`**: Gerenciamento eficiente de cadeias de caracteres, utilizado para armazenar o texto de entrada e para manipular visualizações de contexto sem cópias desnecessárias.
-  - **Implementação:** A função `calcularEntropiaOrdemK` utiliza `string_view` para percorrer contextos de tamanho fixo sem alocar memória extra, otimizando o cálculo da entropia empírica.
-
-- **`<vector>`**, **`<deque>`**, **`<map>`**, **`<unordered_map>`**: Estruturas de dados fundamentais para o modelo PPM.
-  - **Implementação:**
-    - `vector`: Armazena as frequências dos símbolos na tabela de frequência (`SimpleFrequencyTable`) e a lista de símbolos ativos em cada nó da Trie.
-    - `deque`: Gerencia a janela deslizante de histórico no `ContextModel`, mantendo os últimos `k` símbolos processados.
-    - `map`/`unordered_map`: Na Trie (`TrieNode`), os filhos são armazenados em um `unordered_map` (ou `map`) que mapeia o símbolo para o nó correspondente, permitindo busca rápida por contexto.
-
-- **`<cmath>`**: Utilizado para cálculos matemáticos, especialmente funções logarítmicas para entropia e informação.
-  - **Implementação:** As funções `log2` são empregadas no cálculo da entropia de ordem-0 e ordem-k, bem como na acumulação da informação teórica (`l_barra_teorico`) durante a compressão.
-
-- **`<algorithm>`**: Fornece algoritmos genéricos como `fill` para preencher vetores, utilizado na reinicialização da máscara de exclusão.
-  - **Implementação:** Após processar cada símbolo, o vetor `isExcluded` é limpo com `fill(isExcluded.begin(), isExcluded.end(), false)` para preparar a próxima iteração.
-
-- **`<iomanip>`**: Permite a formatação de saída, utilizada para exibir valores numéricos com precisão controlada.
-  - **Implementação:** Nas mensagens de console, valores como taxas de compressão (bits por símbolo) são exibidos com `std::fixed` e `std::setprecision` para facilitar a leitura.
-
-- **`<stdexcept>`**: Fornece classes de exceção padrão para tratamento de erros.
-  - **Implementação:** Em diversos pontos do código (como na verificação de argumentos inválidos ou overflow aritmético), exceções como `std::invalid_argument`, `std::overflow_error` e `std::logic_error` são lançadas para garantir robustez.
-
-- **`<limits>`**: Utilizado para obter valores máximos de tipos inteiros, auxiliando em verificações de estouro.
-  - **Implementação:** No codificador aritmético (`ArithmeticCoderBase`), o valor `maximumTotal` é calculado com base em `std::numeric_limits<decltype(fullRange)>::max()` para evitar que o somatório das frequências ultrapasse os limites do intervalo.
-
-- **`<cstdint>`**: Define tipos de inteiros com largura fixa (`uint32_t`, `uint64_t`), garantindo portabilidade e controle preciso sobre os tamanhos das variáveis utilizadas nos cálculos aritméticos.
-  - **Implementação:** Todo o núcleo da codificação aritmética e das tabelas de frequência utiliza `uint32_t` e `uint64_t` para manipular intervalos e somas sem ambiguidades entre plataformas.
+- **`<iostream>`**: Saída de mensagens de progresso e resultados no terminal.
+- **`<fstream>`**: Leitura dos corpora de treinamento e escrita/leitura dos arquivos `.model` em disco.
+- **`<string>`** e **`<string_view>`**: Gerenciamento de cadeias de caracteres e leitura eficiente de contextos sem alocações desnecessárias.
+- **`<vector>`**, **`<deque>`**, **`<map>`**, **`<unordered_map>`**: Estruturas fundamentais para a Trie e para o histórico de contextos.
+  - `vector`: Armazena as frequências dos símbolos em cada nó da Trie.
+  - `deque`: Mantém a janela deslizante dos últimos `k` caracteres processados no `ContextModel`.
+  - `unordered_map`: Mapeia cada símbolo ao nó filho correspondente na Trie, permitindo busca em O(1).
+- **`<cmath>`**: Funções logarítmicas (`log2`) para o cálculo de BPC e entropia cruzada.
+- **`<algorithm>`**: `fill` para reinicializar o vetor de exclusão (`isExcluded`) a cada símbolo processado.
+- **`<iomanip>`**: Formatação de saída numérica com `std::fixed` e `std::setprecision` nos logs de BPC.
+- **`<stdexcept>`**: Tratamento de erros com `std::invalid_argument` e `std::runtime_error`.
+- **`<limits>`**: Cálculo do `maximumTotal` para evitar overflow nas somas de frequência.
+- **`<cstdint>`**: Tipos de largura fixa (`uint32_t`, `uint64_t`) para portabilidade e controle preciso nas tabelas de frequência.
 
 
 ## :file_folder: Documentação
@@ -98,166 +90,150 @@ Este projeto foi desenvolvido utilizando apenas a biblioteca padrão do C++ (STL
 
 ```text
 .
-├── documentos/                     # Documentação adicional do projeto
+├── documentos/                     # Relatório e apresentação do projeto
+├── models/                         # Modelos treinados por idioma (gerados pelo interpretador)
 ├── headers/
 │   ├── ArithmeticCoder.hpp         # Codificação aritmética (bits e codificador/decodificador)
 │   ├── ContextModel.hpp            # Modelo de contextos PPM (Trie e gerenciamento)
-│   ├── PPM.hpp                     # Funções públicas de compressão/descompressão
 │   ├── tabelaFrequencia.hpp        # Tabelas de frequência com Fenwick Tree e exclusão
 │   └── TrieNode.hpp                # Nó da Trie com frequências e filhos
 ├── src/
 │   ├── ArithmeticCoder.cpp         # Implementação da E/S de bits e codificação
-│   ├── compress.cpp                # Compressão PPM com monitoramento e reset
 │   ├── ContextModel.cpp            # Gerenciamento da árvore de contextos
-│   ├── decompress.cpp              # Descompressão PPM com escapes e reset
-│   ├── tabelaFrequencia.cpp        # Operações em tabelas de frequência
+│   ├── tabelaFrequencia.cpp        # Operações nas tabelas de frequência
 │   └── TrieNode.cpp                # Manipulação dos nós da Trie
-├── main.cpp                        # Ponto de entrada: compressão/descompressão de arquivo
-├── benchmark.ps1                   # Script PowerShell para execução de benchmarks (comparação com 7z)
-├── plotar_benchmark.py             # Geração de gráficos de benchmark (comparação com 7z)
-├── plotar_grafico.py               # Visualização da performance (BPS vs entropias)
-├── plotar_resets.py                # Diagnóstico de resets do modelo adaptativo
-├── plotar_benchmark_consolidado.py # Geração de gráficos de benchmark (para todos os Ks)
-└── README.md                       # Este arquivo, documenta o projeto
+├── interpretador.cpp               # Treinamento: lê corpora e gera os arquivos .model
+├── modelopersistente.cpp           # Serialização/desserialização da Trie em disco
+├── avaliador.cpp                   # Identificação: calcula BPC e aponta o idioma
+├── treinar_todos.sh                # Script para treinar todos os 27 idiomas em sequência
+├── plotar_resultados.py            # Geração dos gráficos de BPC por idioma
+└── README.md                       # Este arquivo
 ```
 
 ### :page_facing_up: Classes e Atributos
 
-O sistema de compressão PPM é estruturado em torno de classes que implementam a codificação aritmética, o gerenciamento de frequências e o modelo de contextos. Abaixo estão as principais classes e seus atributos.
+O sistema é estruturado em torno de classes que implementam a codificação aritmética, o gerenciamento de frequências e o modelo de contextos PPM.
 
-**1. Classes de Entrada/Saída de Bits**  
+**1. Classes de Entrada/Saída de Bits**
 Responsáveis por ler e escrever bits individuais em fluxos de bytes.
 
-- **`BitInputStream`**  
-  **Atributos:**
-  - `input` (`std::istream&`): Referência para o fluxo de entrada de bytes.  
-  - `currentByte` (`int`): Byte atual sendo processado (pode ser `EOF`).  
-  - `numBitsRemaining` (`int`): Quantidade de bits restantes a serem lidos do `currentByte`.
+- **`BitInputStream`**
+  - `input` (`std::istream&`): Fluxo de entrada de bytes.
+  - `currentByte` (`int`): Byte atual sendo processado.
+  - `numBitsRemaining` (`int`): Bits restantes a ler do `currentByte`.
 
-- **`BitOutputStream`**  
-  **Atributos:**
-  - `output` (`std::ostream&`): Referência para o fluxo de saída de bytes.  
-  - `currentByte` (`int`): Byte sendo construído bit a bit.  
-  - `numBitsFilled` (`int`): Número de bits já armazenados no `currentByte`.
+- **`BitOutputStream`**
+  - `output` (`std::ostream&`): Fluxo de saída de bytes.
+  - `currentByte` (`int`): Byte sendo construído bit a bit.
+  - `numBitsFilled` (`int`): Bits já armazenados no `currentByte`.
 
-**2. Classes Base da Codificação Aritmética**  
-Fornecem a lógica compartilhada entre codificador e decodificador.
+**2. Classes Base da Codificação Aritmética**
 
-- **`ArithmeticCoderBase`** (classe abstrata)  
-  **Atributos:** 
-  - `numStateBits` (`int`): Número de bits usados para o estado interno (precisão).  
-  - `fullRange` (`uint64_t`): Valor máximo do intervalo (`1 << numStateBits`).  
-  - `halfRange`, `quarterRange`, `minimumRange` (`uint64_t`): Constantes derivadas para detecção de underflow/overflow.  
-  - `maximumTotal` (`uint64_t`): Maior soma de frequências suportada.  
-  - `stateMask` (`uint64_t`): Máscara para limitar os valores ao intervalo.  
-  - `low`, `high` (`uint64_t`): Limites inferior e superior do intervalo atual.
+- **`ArithmeticCoderBase`** (classe abstrata)
+  - `numStateBits` (`int`): Precisão do intervalo aritmético.
+  - `fullRange`, `halfRange`, `quarterRange`, `minimumRange` (`uint64_t`): Constantes para controle do intervalo.
+  - `maximumTotal` (`uint64_t`): Soma máxima de frequências suportada.
+  - `low`, `high` (`uint64_t`): Limites atual do intervalo.
 
-- **`ArithmeticDecoder`** (herda de `ArithmeticCoderBase`)  
-  **Atributos:**
-  - `input` (`BitInputStream&`): Fluxo de bits de entrada.  
-  - `code` (`uint64_t`): Valor codificado atual (os bits já lidos).
+- **`ArithmeticDecoder`** — `input` (`BitInputStream&`), `code` (`uint64_t`).
+- **`ArithmeticEncoder`** — `output` (`BitOutputStream&`), `numUnderflow` (`int`).
 
-- **`ArithmeticEncoder`** (herda de `ArithmeticCoderBase`)  
-  **Atributos:** 
-  - `output` (`BitOutputStream&`): Fluxo de bits de saída.  
-  - `numUnderflow` (`int`): Contador de underflows pendentes para serem escritos.
+**3. Classes de Tabela de Frequência**
 
-**3. Classes de Tabela de Frequência**  
-Gerenciam as contagens de símbolos para o codificador aritmético, incluindo suporte a exclusão (princípio PPMC) e redimensionamento.
+- **`SimpleFrequencyTable`** (implementa `FrequencyTable`)
+  - `frequencies` (`std::vector<uint32_t>`): Frequências absolutas de cada símbolo (0–255 + escape).
+  - `tree` (`std::vector<uint32_t>`): Árvore de Fenwick para somas acumuladas em O(log n).
+  - `total` (`uint32_t`): Soma total das frequências.
+  - `savedFrequencies`: Pilha de frequências salvas para o mecanismo de exclusão (PPM-C).
 
-- **`FrequencyTable`** (classe abstrata)  
-  Define a interface para consulta e atualização de frequências.
+**4. Classes do Modelo PPM**
 
-- **`FlatFrequencyTable`** (implementa `FrequencyTable`)  
-  **Atributos:**  
-  - `numSymbols` (`uint32_t`): Número de símbolos; todos têm frequência 1.
+- **`TrieNode`**
+  - `freqTable` (`std::unique_ptr<SimpleFrequencyTable>`): Tabela de frequências para este contexto.
+  - `children` (`std::map<uint32_t, std::unique_ptr<TrieNode>>`): Filhos na árvore de prefixos.
+  - `activeSymbols` (`std::vector<uint32_t>`): Símbolos já vistos neste contexto (usado na exclusão).
 
-- **`SimpleFrequencyTable`** (implementa `FrequencyTable`)  
-  **Atributos:**
-  - `frequencies` (`std::vector<uint32_t>`): Vetor com as frequências absolutas de cada símbolo.  
-  - `tree` (`std::vector<uint32_t>`): Árvore de Fenwick para consultas rápidas de soma acumulada.  
-  - `total` (`uint32_t`): Soma total de todas as frequências.  
-  - `savedFrequencies` (`std::vector<std::pair<uint32_t, uint32_t>>`): Pilha de frequências originais de símbolos excluídos temporariamente.
-
-**4. Classes do Modelo PPM**  
-Representam a estrutura de contextos (Trie) e o gerenciamento do histórico.
-
-- **`TrieNode`**  
-  **Atributos:**
-  - `freqTable` (`std::unique_ptr<SimpleFrequencyTable>`): Tabela de frequências para este contexto (símbolos 0–255, 256 (escape), 257 (EOF), 258 (reset)).  
-  - `children` (`std::map<uint32_t, std::unique_ptr<TrieNode>>`): Mapeamento de símbolo para o próximo nó na árvore (contexto de ordem superior).  
-  - `activeSymbols` (`std::vector<uint32_t>`): Lista de símbolos já vistos neste contexto (usada para exclusão e cálculo do peso do escape).
-
-- **`ContextModel`**  
-  **Atributos:**  
-  - `maxOrder` (`int`): Ordem máxima do modelo PPM (k).  
-  - `root` (`std::unique_ptr<TrieNode>`): Raiz da árvore (contexto de ordem 0).  
-  - `history` (`std::deque<uint32_t>`): Janela deslizante com os últimos símbolos processados (tamanho ≤ `maxOrder`).
+- **`ContextModel`**
+  - `maxOrder` (`int`): Ordem máxima do modelo ($K_{max}$).
+  - `root` (`std::unique_ptr<TrieNode>`): Raiz da Trie.
+  - `history` (`std::deque<uint32_t>`): Janela deslizante com os últimos `maxOrder` símbolos.
 
 ## :gear: Como rodar
 
-[**Atenção:** Lembre de baixar o projeto e extraí-lo devidamente do `.zip`.](#zap-simulação-de-circuitos-rlc-paralelo)
+> **Atenção:** Lembre de baixar o projeto e extraí-lo devidamente do `.zip`.
 
 #### Requisitos
-- Um compilador C++ (recomendamos `g++` ou `clang++`)
+- Compilador C++ (`g++` ou `clang++`)
 - Terminal de linha de comando
-- Python 3 com as bibliotecas `matplotlib` e `pandas` para gerar os gráficos de desempenho
+- Python 3 com `matplotlib` e `pandas` para geração dos gráficos
 
 ```sh
 pip install matplotlib pandas
 ```
 
-### No Windows
+---
 
-Utilizando `g++` para compilar:
+### Etapa 1 — Treinamento (gerar os modelos)
 
-```sh
-g++ src/*.cpp main.cpp -o ppm_compressao -O2
-```
-
-Utilizando `clang++` para compilar:
+Compile o interpretador:
 
 ```sh
-clang++ src/*.cpp main.cpp -o ppm_compressao -O2
+# Linux / Git Bash / WSL
+g++ src/*.cpp interpretador.cpp modelopersistente.cpp -o interpretador -O2
+
+# Windows (PowerShell)
+g++ src/*.cpp interpretador.cpp modelopersistente.cpp -o interpretador.exe -O2
 ```
 
-Para rodar:
+Treine um idioma específico (ex: Português):
 
 ```sh
-# Comprimir um arquivo (Ex: ordem K=4)
-./ppm_compressao.exe -c silesia/dickens dickens.bin 4
-
-# Descomprimir um arquivo
-./ppm_compressao.exe -d dickens.bin dickens_restaurado.txt 4
-
-# Para rodar o benchmark em todo o Corpus Silesia (comportamento padrão):
-./ppm_compressao.exe 4 benchmark_resultados.csv
+./interpretador corpus/por.txt models/por.model 4
 ```
 
-Pós-execução do PPM-C:
-
-```sh:
-python plotar_grafico.py
-```
-
-### No Linux
-
-Utilizando `g++` para compilar e executar em seguida:
+Ou treine todos os idiomas de uma vez usando o script:
 
 ```sh
-g++ src/*.cpp main.cpp -o ppm_compressao -O2 && ./ppm_compressao
+bash treinar_todos.sh
 ```
 
-Utilizando `clang++` para compilar e executar em seguida:
+> O parâmetro final (`4`) é o valor de $K_{max}$. Os modelos gerados ficam no diretório `models/` e ocupam cerca de **6 GB** no total.
+
+---
+
+### Etapa 2 — Identificação (avaliar um texto)
+
+Compile o avaliador:
 
 ```sh
-clang++ src/*.cpp main.cpp -o ppm_compressao -O2 && ./ppm_compressao
+# Linux / Git Bash / WSL
+g++ src/*.cpp avaliador.cpp modelopersistente.cpp -o avaliador -O2
+
+# Windows (PowerShell)
+g++ src/*.cpp avaliador.cpp modelopersistente.cpp -o avaliador.exe -O2
 ```
 
-Pós-execução do PPM-C:
+Execute a identificação:
 
-```sh:
-python3 plotar_grafico.py
+```sh
+# Linux
+./avaliador "Eu amo Teoria da Informação!" models/ 4
+
+# Windows
+./avaliador.exe "Eu amo Teoria da Informação!" models/ 4
 ```
 
-**OBS.:** Utilizamos de barra normal ('/') considerando um ambiente como Git Bash, WSL e PowerShell, considere utilizar de barra invertida ('\\') em caso de não compilar
+O sistema calculará o BPC do texto frente a cada um dos 27 modelos e exibirá o idioma identificado, além da lista completa de idiomas ordenada por custo.
+
+---
+
+### Etapa 3 — Geração dos gráficos
+
+Após executar o avaliador e exportar os resultados em `.txt`:
+
+```sh
+python3 plotar_resultados.py   # Linux / macOS
+python  plotar_resultados.py   # Windows
+```
+
+**OBS.:** Utilizamos barra normal (`/`) considerando ambientes como Git Bash, WSL e PowerShell. Em caso de problemas no Windows com `cmd.exe`, substitua por barra invertida (`\`).
